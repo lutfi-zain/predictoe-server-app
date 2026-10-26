@@ -1,0 +1,120 @@
+name: Build & Release APK
+
+on:
+  release:
+    types: [published, created]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type (release or debug)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Make Gradlew Executable
+        run: chmod +x ./gradlew
+
+      - name: Prepare Environment (.env)
+        run: |
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
+      - name: Prepare Signing Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "Menggunakan keystore rahasia dari GitHub Secrets..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
+          else
+            echo "Membuat fallback upload keystore untuk release build..."
+            keytool -genkeypair -v \
+              -keystore my-upload-key.jks \
+              -alias upload \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "${KEYSTORE_PASSWORD:-android}" \
+              -keypass "${KEY_PASSWORD:-android}" \
+              -dname "CN=IDCloudVM, OU=Mobile, O=IDCloudHost, L=Jakarta, C=ID"
+          fi
+
+      - name: Build APK with Gradle
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'android' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
+          KEYSTORE_PATH: my-upload-key.jks
+        run: |
+          if [ "${{ github.event.inputs.build_type }}" = "debug" ]; then
+            ./gradlew assembleDebug
+          else
+            ./gradlew assembleRelease
+          fi
+
+      - name: Package & Locate APK
+        id: locate_apk
+        run: |
+          TAG_OR_BRANCH="${{ github.ref_name }}"
+          [ -z "$TAG_OR_BRANCH" ] && TAG_OR_BRANCH="manual"
+          
+          # Cari file APK yang berhasil di-build
+          APK_PATH=$(find app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          
+          if [ -z "$APK_PATH" ]; then
+            echo "Error: File APK tidak ditemukan!"
+            exit 1
+          fi
+          
+          OUTPUT_NAME="idcloud-vm-${TAG_OR_BRANCH}.apk"
+          cp "$APK_PATH" "$OUTPUT_NAME"
+          echo "APK berhasil disiapkan di $OUTPUT_NAME"
+          echo "apk_path=$OUTPUT_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: idcloud-vm-apk
+          path: ${{ steps.locate_apk.outputs.apk_path }}
+          retention-days: 14
+
+      - name: Attach APK to GitHub Release
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.locate_apk.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
