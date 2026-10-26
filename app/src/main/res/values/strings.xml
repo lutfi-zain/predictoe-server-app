@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">IDCloud VM</string>
+    <string name="widget_description">Widget status VM IDCloudHost dan kontrol cepat Start &amp; Stop</string>
+</resources>
