@@ -6,6 +6,8 @@ on:
   push:
     tags:
       - 'v*'
+      - '[0-9]+*'
+      - '*'
   workflow_dispatch:
     inputs:
       build_type:
@@ -16,6 +18,10 @@ on:
         options:
           - release
           - debug
+      tag_name:
+        description: 'Release Tag Name (optional, e.g. 0.0.1 - uploads APK to this release if provided)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -57,6 +63,8 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          KEY_PASS="${KEY_PASSWORD:-android}"
+          STORE_PASS="${KEYSTORE_PASSWORD:-android}"
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "Menggunakan keystore rahasia dari GitHub Secrets..."
             echo "$KEYSTORE_BASE64" | base64 --decode > my-upload-key.jks
@@ -68,41 +76,46 @@ jobs:
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
-              -storepass "${KEYSTORE_PASSWORD:-android}" \
-              -keypass "${KEY_PASSWORD:-android}" \
+              -storepass "$STORE_PASS" \
+              -keypass "$KEY_PASS" \
               -dname "CN=IDCloudVM, OU=Mobile, O=IDCloudHost, L=Jakarta, C=ID"
           fi
 
       - name: Build APK with Gradle
         env:
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'android' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}
-          KEYSTORE_PATH: my-upload-key.jks
+          STORE_PASSWORD_SECRET: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
         run: |
-          if [ "${{ github.event.inputs.build_type }}" = "debug" ]; then
-            ./gradlew assembleDebug
+          export STORE_PASSWORD="${STORE_PASSWORD_SECRET:-android}"
+          export KEY_PASSWORD="${KEY_PASSWORD_SECRET:-android}"
+          BUILD_TYPE="${{ github.event.inputs.build_type }}"
+          if [ "$BUILD_TYPE" = "debug" ]; then
+            ./gradlew assembleDebug --stacktrace
           else
-            ./gradlew assembleRelease
+            ./gradlew assembleRelease --stacktrace
           fi
 
       - name: Package & Locate APK
         id: locate_apk
         run: |
-          TAG_OR_BRANCH="${{ github.ref_name }}"
-          [ -z "$TAG_OR_BRANCH" ] && TAG_OR_BRANCH="manual"
+          TARGET_TAG="${{ github.event.release.tag_name || github.event.inputs.tag_name || github.ref_name }}"
+          [ -z "$TARGET_TAG" ] && TARGET_TAG="manual"
+          SAFE_TAG=$(echo "$TARGET_TAG" | sed 's/[^a-zA-Z0-9._-]/-/g')
           
           # Cari file APK yang berhasil di-build
-          APK_PATH=$(find app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          APK_PATH=$(find app/build/outputs/apk -type f -name "*.apk" ! -name "*unaligned*" | head -n 1)
           
           if [ -z "$APK_PATH" ]; then
             echo "Error: File APK tidak ditemukan!"
             exit 1
           fi
           
-          OUTPUT_NAME="idcloud-vm-${TAG_OR_BRANCH}.apk"
+          OUTPUT_NAME="idcloud-vm-${SAFE_TAG}.apk"
           cp "$APK_PATH" "$OUTPUT_NAME"
-          echo "APK berhasil disiapkan di $OUTPUT_NAME"
+          echo "APK berhasil disiapkan di $OUTPUT_NAME (dari $APK_PATH)"
           echo "apk_path=$OUTPUT_NAME" >> $GITHUB_OUTPUT
+          echo "target_tag=$TARGET_TAG" >> $GITHUB_OUTPUT
 
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
@@ -112,9 +125,10 @@ jobs:
           retention-days: 14
 
       - name: Attach APK to GitHub Release
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name != '')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.locate_apk.outputs.apk_path }}
+          tag_name: ${{ steps.locate_apk.outputs.target_tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
