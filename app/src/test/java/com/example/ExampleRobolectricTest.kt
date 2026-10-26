@@ -49,4 +49,46 @@ class ExampleRobolectricTest {
         prefs.saveRegion("jkt02")
         assertEquals("jkt02", prefs.getRegion())
     }
+
+    @Test
+    fun `vmItem parses idcloudhost json with storage array correctly`() {
+        val json = """
+        [
+          {
+            "uuid": "fc880f74-cf03-4a7a-93da-74c506157023",
+            "name": "Ubuntu-Server",
+            "status": "running",
+            "vcpu": 2,
+            "memory": 2048,
+            "private_ipv4": "10.123.8.223",
+            "public_ipv4": "103.150.190.1",
+            "storage": [
+              {
+                "id": 8,
+                "name": "sda",
+                "primary": true,
+                "size": 20,
+                "uuid": "fc880f74-cf03-4a7a-93da-74c506157023"
+              }
+            ]
+          }
+        ]
+        """.trimIndent()
+
+        val moshi = com.squareup.moshi.Moshi.Builder()
+            .add(com.example.data.model.VmStorageListAdapter())
+            .add(com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory())
+            .build()
+
+        val type = com.squareup.moshi.Types.newParameterizedType(List::class.java, VmItem::class.java)
+        val adapter = moshi.adapter<List<VmItem>>(type)
+        val list = adapter.fromJson(json)
+
+        assertEquals(1, list?.size)
+        val item = list?.first()
+        assertEquals("Ubuntu-Server", item?.name)
+        assertEquals("103.150.190.1", item?.displayIp)
+        assertEquals(20, item?.diskSize)
+        assertTrue(item?.isRunning == true)
+    }
 }

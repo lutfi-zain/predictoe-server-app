@@ -13,6 +13,7 @@ object ApiClient {
 
     private val moshi: Moshi by lazy {
         Moshi.Builder()
+            .add(com.example.data.model.VmStorageListAdapter())
             .add(KotlinJsonAdapterFactory())
             .build()
     }

@@ -17,6 +17,7 @@ import com.example.ui.components.ModifyVmDialog
 import com.example.ui.components.SettingsDialog
 import com.example.ui.screens.ApiKeyLoginScreen
 import com.example.ui.screens.VmDashboardScreen
+import com.example.ui.screens.VmDetailScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.NeoBackground
 
@@ -52,6 +53,19 @@ fun VmApp(viewModel: VmViewModel) {
             errorMessage = state.errorMessage,
             onConnect = { key -> viewModel.submitApiKey(key) }
         )
+    } else if (state.selectedDetailVm != null) {
+        val detailVm = state.selectedDetailVm!!
+        VmDetailScreen(
+            vm = detailVm,
+            region = state.selectedRegion,
+            isWidgetPinned = state.widgetPinnedUuid == detailVm.uuid,
+            isActionLoading = state.isActionLoading && state.activeActionVmUuid == detailVm.uuid,
+            onBack = { viewModel.closeVmDetail() },
+            onStartClick = { viewModel.startVm(detailVm) },
+            onStopClick = { viewModel.stopVm(detailVm) },
+            onModifyClick = { viewModel.openModifyDialog(detailVm) },
+            onPinWidgetClick = { viewModel.pinToWidget(detailVm) }
+        )
     } else {
         VmDashboardScreen(
             vmList = state.vmList,
@@ -72,6 +86,7 @@ fun VmApp(viewModel: VmViewModel) {
             onStopVm = { vm -> viewModel.stopVm(vm) },
             onModifyVm = { vm -> viewModel.openModifyDialog(vm) },
             onPinWidget = { vm -> viewModel.pinToWidget(vm) },
+            onVmClick = { vm -> viewModel.openVmDetail(vm) },
             onClearStatusMessage = { viewModel.clearStatusMessage() }
         )
     }

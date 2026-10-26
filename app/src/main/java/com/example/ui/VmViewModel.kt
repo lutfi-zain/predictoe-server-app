@@ -30,7 +30,8 @@ data class VmUiState(
     val selectedVmForModify: VmItem? = null,
     val isSettingsOpen: Boolean = false,
     val searchQuery: String = "",
-    val widgetPinnedUuid: String? = null
+    val widgetPinnedUuid: String? = null,
+    val selectedDetailVm: VmItem? = null
 )
 
 class VmViewModel(application: Application) : AndroidViewModel(application) {
@@ -187,10 +188,15 @@ class VmViewModel(application: Application) : AndroidViewModel(application) {
                     val updatedList = state.vmList.map {
                         if (it.uuid == vm.uuid) it.copy(status = "RUNNING") else it
                     }
+                    val updatedDetail = if (state.selectedDetailVm?.uuid == vm.uuid) {
+                        state.selectedDetailVm.copy(status = "RUNNING")
+                    } else state.selectedDetailVm
+
                     state.copy(
                         isActionLoading = false,
                         activeActionVmUuid = null,
                         vmList = updatedList,
+                        selectedDetailVm = updatedDetail,
                         statusMessage = "VM '${vm.name}' berhasil dinyalakan"
                     )
                 }
@@ -224,10 +230,15 @@ class VmViewModel(application: Application) : AndroidViewModel(application) {
                     val updatedList = state.vmList.map {
                         if (it.uuid == vm.uuid) it.copy(status = "STOPPED") else it
                     }
+                    val updatedDetail = if (state.selectedDetailVm?.uuid == vm.uuid) {
+                        state.selectedDetailVm.copy(status = "STOPPED")
+                    } else state.selectedDetailVm
+
                     state.copy(
                         isActionLoading = false,
                         activeActionVmUuid = null,
                         vmList = updatedList,
+                        selectedDetailVm = updatedDetail,
                         statusMessage = "VM '${vm.name}' berhasil dimatikan"
                     )
                 }
@@ -242,6 +253,14 @@ class VmViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun openVmDetail(vm: VmItem) {
+        _uiState.update { it.copy(selectedDetailVm = vm) }
+    }
+
+    fun closeVmDetail() {
+        _uiState.update { it.copy(selectedDetailVm = null) }
     }
 
     fun openModifyDialog(vm: VmItem) {
@@ -280,14 +299,25 @@ class VmViewModel(application: Application) : AndroidViewModel(application) {
                             it.copy(
                                 name = newName,
                                 vcpu = newVcpu,
-                                ramRaw = newRamMb
+                                ramRaw = newRamMb,
+                                memory = newRamMb
                             )
                         } else it
                     }
+                    val updatedDetail = if (state.selectedDetailVm?.uuid == targetVm.uuid) {
+                        state.selectedDetailVm.copy(
+                            name = newName,
+                            vcpu = newVcpu,
+                            ramRaw = newRamMb,
+                            memory = newRamMb
+                        )
+                    } else state.selectedDetailVm
+
                     state.copy(
                         isActionLoading = false,
                         activeActionVmUuid = null,
                         vmList = updatedList,
+                        selectedDetailVm = updatedDetail,
                         statusMessage = "Spesifikasi '${newName}' berhasil diperbarui!"
                     )
                 }

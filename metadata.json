@@ -2,5 +2,7 @@
   "name": "IDCloud VM",
   "description": "Kelola VM IDCloudHost: list, start, stop, modify spek vCPU/RAM, dan widget home screen bergaya Neobrutalism.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

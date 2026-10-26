@@ -75,6 +75,7 @@ fun VmDashboardScreen(
     onStopVm: (VmItem) -> Unit,
     onModifyVm: (VmItem) -> Unit,
     onPinWidget: (VmItem) -> Unit,
+    onVmClick: (VmItem) -> Unit,
     onClearStatusMessage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -422,6 +423,7 @@ fun VmDashboardScreen(
                             vm = vm,
                             isWidgetPinned = widgetPinnedUuid == vm.uuid,
                             isActionLoading = isActionLoading && activeActionVmUuid == vm.uuid,
+                            onCardClick = { onVmClick(vm) },
                             onStartClick = { onStartVm(vm) },
                             onStopClick = { onStopVm(vm) },
                             onModifyClick = { onModifyVm(vm) },

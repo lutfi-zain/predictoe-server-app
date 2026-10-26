@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,7 @@ fun VmCardItem(
     vm: VmItem,
     isWidgetPinned: Boolean,
     isActionLoading: Boolean,
+    onCardClick: () -> Unit = {},
     onStartClick: () -> Unit,
     onStopClick: () -> Unit,
     onModifyClick: () -> Unit,
@@ -56,6 +58,7 @@ fun VmCardItem(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable { onCardClick() }
                 .padding(14.dp)
         ) {
             // Header: Name and Status
@@ -80,7 +83,17 @@ fun VmCardItem(
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                StatusBadge(status = vm.status)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    StatusBadge(status = vm.status)
+                    BrutalBadge(
+                        text = "DETAIL ›",
+                        backgroundColor = Color(0xFFF3F1E7),
+                        fontSize = 10
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
